@@ -255,6 +255,7 @@
                     
                     let commaCount = 0;
                     let validRows = 0;
+                    let totalTextLength = 0;
                     const uniqueValues = new Set();
                     const valueCounts = {};
 
@@ -262,7 +263,9 @@
                         const val = row[i];
                         if (val !== undefined && val !== null && val !== '') {
                             validRows++;
-                            const strVal = String(val);
+                            const strVal = String(val).trim();
+                            totalTextLength += strVal.length;
+                            
                             if (strVal.includes(',')) commaCount++;
                             uniqueValues.add(strVal);
                             
@@ -280,8 +283,15 @@
                     const isMultiSelectOrFrequency = (commaCount / validRows > 0.15) || headerTextUpper.includes('N-') || headerTextUpper.includes('تكرار');
                     const uniqueKeys = Object.keys(valueCounts);
 
-                    // 2. Ignore Open-Ended Suggestions (High unique strings, no commas)
-                    if (!isMultiSelectOrFrequency && uniqueValues.size > 15 && uniqueValues.size / validRows > 0.3) {
+                    // Calculate average string length to detect sentences/open-ended questions
+                    const avgStrLength = validRows > 0 ? totalTextLength / validRows : 0;
+
+                    // 2. Ignore Open-Ended Suggestions (Sentences, High unique strings, no pattern)
+                    const isHighlyUnique = (uniqueValues.size / validRows) > 0.4 && validRows > 5;
+                    const hasManyUniqueValues = uniqueValues.size > 12;
+                    const isLongText = avgStrLength > 35; // Sentences usually have longer average lengths
+
+                    if (!isMultiSelectOrFrequency && (isHighlyUnique || hasManyUniqueValues || isLongText)) {
                         openEndedCount++;
                         continue;
                     }
