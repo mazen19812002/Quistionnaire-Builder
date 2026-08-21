@@ -215,6 +215,17 @@
             
             const [participantsCount, setParticipantsCount] = useState(100);
             
+            const [participantMode, setParticipantMode] = useState('simple'); 
+            const [categoryTitle, setCategoryTitle] = useState('البرنامج / القسم');
+            const [categories, setCategories] = useState([
+                { id: 'c1', text: 'برنامج العلوم الأساسية', selected: true, count: 50, expectedPercentage: 85 },
+                { id: 'c2', text: 'برنامج الهندسة المدنية', selected: true, count: 50, expectedPercentage: 85 },
+                { id: 'c3', text: 'برنامج الهندسة المعمارية', selected: true, count: 50, expectedPercentage: 85 },
+                { id: 'c4', text: 'برنامج الهندسة الكهربية', selected: true, count: 50, expectedPercentage: 85 },
+                { id: 'c5', text: 'برنامج هندسة الإلكترونيات والاتصالات الكهربية', selected: true, count: 50, expectedPercentage: 85 },
+                { id: 'c6', text: 'برنامج هندسة الحاسبات والتحكم الالي', selected: true, count: 50, expectedPercentage: 85 }
+            ]);
+            
             const [tempPromptValue, setTempPromptValue] = useState('');
             const [tempItemCount, setTempItemCount] = useState(5);
             
@@ -733,6 +744,10 @@
                             const col0 = String(row[0]).trim();
                             if (col0.startsWith('متوسط إيجابيات') || col0.startsWith('متوسطات الأعمدة') || col0.startsWith('متوسطات')) continue;
                             
+                            if (col0 === 'المحور' && row.indexOf('الفئة') !== -1) {
+                                continue; 
+                            }
+                            
                             if (col0 === 'المحور' || col0 === 'المجال') {
                                 itemIdx = row.indexOf('البنود') !== -1 ? row.indexOf('البنود') : 1;
                                 let scalesEndIdx = row.findIndex((h, idx) => idx > itemIdx && h && (String(h).includes('إجمالي') || String(h).includes('المجموع')));
@@ -958,43 +973,23 @@
                     }));
                 });
             };
-            
-            const addCategoryList = () => {
-                const newDomainId = Date.now().toString();
-                const initialItems = [
-                    { id: `c1_${newDomainId}`, text: 'برنامج العلوم الأساسية', selected: true, count: 50, expectedPercentage: 85 },
-                    { id: `c2_${newDomainId}`, text: 'برنامج الهندسة المدنية', selected: true, count: 50, expectedPercentage: 85 },
-                    { id: `c3_${newDomainId}`, text: 'برنامج الهندسة المعمارية', selected: true, count: 50, expectedPercentage: 85 },
-                    { id: `c4_${newDomainId}`, text: 'برنامج الهندسة الكهربية', selected: true, count: 50, expectedPercentage: 85 },
-                    { id: `c5_${newDomainId}`, text: 'برنامج هندسة الإلكترونيات والاتصالات الكهربية', selected: true, count: 50, expectedPercentage: 85 },
-                    { id: `c6_${newDomainId}`, text: 'برنامج هندسة الحاسبات والتحكم الالي', selected: true, count: 50, expectedPercentage: 85 }
-                ];
-                
-                setDomains(prev => [{ 
-                    id: newDomainId, 
-                    name: 'البرنامج / القسم', 
-                    isCategoryList: true,
-                    items: initialItems,
-                    scales: [] 
-                }, ...prev]);
+
+            const addCategory = () => {
+                setCategories([...categories, {
+                    id: `c_${Date.now()}_${Math.random()}`,
+                    text: 'برنامج/فئة جديدة',
+                    selected: true,
+                    count: 50,
+                    expectedPercentage: 85
+                }]);
             };
 
-            const addItemToCategory = (domainId) => {
-                setDomains(domains.map(d => {
-                    if (d.id === domainId) {
-                        return {
-                            ...d,
-                            items: [...d.items, {
-                                id: `c_${Date.now()}_${Math.random()}`,
-                                text: 'برنامج جديد',
-                                selected: true,
-                                count: 50,
-                                expectedPercentage: 85
-                            }]
-                        }
-                    }
-                    return d;
-                }));
+            const updateCategoryField = (id, field, value) => {
+                setCategories(categories.map(c => c.id === id ? { ...c, [field]: value } : c));
+            };
+
+            const removeCategory = (id) => {
+                setCategories(categories.filter(c => c.id !== id));
             };
             
             const handleScaleDragStart = (e, domainId, index) => {
@@ -1183,24 +1178,23 @@
             };
             
             const exportTemplate = () => {
-                if (domains.length === 0) {
+                if (domains.length === 0 && (participantMode !== 'category' || categories.length === 0)) {
                     showAlert('يرجى إضافة بيانات لتصديرها أولاً.');
                     return;
                 }
                 const data = [];
                 
+                if (participantMode === 'category') {
+                    data.push(['المحور', 'الفئة', 'العدد', 'النسبة المتوقعة']);
+                    categories.forEach(item => {
+                        if (item.selected) {
+                            data.push([categoryTitle, item.text, item.count, `${item.expectedPercentage}%`]);
+                        }
+                    });
+                    data.push([]);
+                }
+                
                 domains.forEach(domain => {
-                    if (domain.isCategoryList) {
-                        data.push(['المحور', 'الفئة', 'العدد', 'النسبة المتوقعة']);
-                        domain.items.forEach(item => {
-                            if (item.selected) {
-                                data.push([domain.name, item.text, item.count, `${item.expectedPercentage}%`]);
-                            }
-                        });
-                        data.push([]);
-                        return;
-                    }
-
                     const header = ['المحور', 'البنود', ...domain.scales.map(s => s.name), 'إجمالي الصف', 'الإيجابيات'];
                     data.push(header);
                     
@@ -1247,36 +1241,39 @@
             };
             
             const exportGoogleFormsMock = () => {
-                if (domains.length === 0) {
+                if (domains.length === 0 && (participantMode !== 'category' || categories.length === 0)) {
                     showAlert('يرجى إضافة بيانات لإنشاء نتائج متوقعة أولاً.');
                     return;
                 }
                 
                 let finalParticipantsCount = participantsCount;
-                const catDomain = domains.find(d => d.isCategoryList);
-                if (catDomain) {
-                    const sum = catDomain.items.filter(i => i.selected).reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
+                if (participantMode === 'category') {
+                    const sum = categories.filter(i => i.selected).reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
                     if (sum > 0) {
-                        finalParticipantsCount = sum; // Sync total participants with category counts
+                        finalParticipantsCount = sum; 
                     }
                 }
 
                 const data = [];
-                const allItems = domains.flatMap(d => {
-                    if (d.isCategoryList) {
-                        return {
+                let allItems = [];
+                
+                if (participantMode === 'category') {
+                    allItems.push({
+                        isCategoryList: true,
+                        question: categoryTitle,
+                        items: categories.filter(i => i.selected)
+                    });
+                }
+                
+                domains.forEach(d => {
+                    d.items.forEach(i => {
+                        allItems.push({
                             domainId: d.id,
-                            question: d.name,
-                            isCategoryList: true,
-                            items: d.items.filter(i => i.selected)
-                        };
-                    }
-                    return d.items.map(i => ({
-                        domainId: d.id,
-                        question: (d.isFrequencyQuestion || i.isMultiSelect) ? d.name : `${d.name} [${i.text}]`,
-                        values: i.values,
-                        isMultiSelect: d.isFrequencyQuestion || i.isMultiSelect
-                    }));
+                            question: (d.isFrequencyQuestion || i.isMultiSelect) ? d.name : `${d.name} [${i.text}]`,
+                            values: i.values,
+                            isMultiSelect: d.isFrequencyQuestion || i.isMultiSelect
+                        });
+                    });
                 });
                 
                 const header = ['Timestamp', ...allItems.map(i => i.question)];
@@ -1292,13 +1289,11 @@
                             }
                         });
                         
-                        // Randomize Demographics to look authentic
                         for (let i = distribution.length - 1; i > 0; i--) {
                             const j = Math.floor(Math.random() * (i + 1));
                             [distribution[i], distribution[j]] = [distribution[j], distribution[i]];
                         }
                         
-                        // Ensure it perfectly matches finalParticipantsCount
                         if (distribution.length < finalParticipantsCount) {
                             const diff = finalParticipantsCount - distribution.length;
                             for (let i = 0; i < diff; i++) distribution.push(distribution[0] || '');
@@ -1523,37 +1518,136 @@
                         </div>
                     </div>
                     
-                    <div className="bg-white p-3 rounded-xl shadow-md mb-5 border-t-4 border-teal-500 flex flex-col sm:flex-row justify-center items-center gap-3 hover-zoom">
-                        <h2 className="text-base md:text-lg thin-title text-gray-800 font-bold m-0 drop-shadow-sm flex items-center gap-2">
-                            <span className="text-xl animate-pulse">👥</span> عدد المشاركين (Participants)
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-stretch shadow-inner rounded-lg overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
+                    <div className="bg-white p-4 rounded-xl shadow-md mb-5 border-t-4 border-teal-500 hover-zoom transition-all duration-300">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-3 pb-3 border-b border-gray-100">
+                            <h2 className="text-base md:text-lg thin-title text-gray-800 font-bold m-0 drop-shadow-sm flex items-center gap-2">
+                                <span className="text-xl animate-pulse">👥</span> إعدادات المشاركين في الاستبيان
+                            </h2>
+                            
+                            <div className="flex bg-gray-100 p-1 rounded-lg shadow-inner">
                                 <button 
-                                    onClick={() => setParticipantsCount(Math.max(1, participantsCount - 1))}
-                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 flex items-center justify-center transition-colors border-l border-gray-300 rounded-r cursor-pointer"
+                                    onClick={() => setParticipantMode('simple')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${participantMode === 'simple' ? 'bg-white shadow-sm text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
                                 >
-                                    <i className="fas fa-minus text-sm"></i>
+                                    إدخال رقم ثابت
                                 </button>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={participantsCount}
-                                    onChange={(e) => setParticipantsCount(Math.max(1, Number(e.target.value)))}
-                                    className="w-20 p-2 text-xl text-center focus:outline-none font-black text-teal-800 leading-none bg-transparent"
-                                />
                                 <button 
-                                    onClick={() => setParticipantsCount(participantsCount + 1)}
-                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 flex items-center justify-center transition-colors border-r border-gray-300 rounded-l cursor-pointer"
+                                    onClick={() => setParticipantMode('category')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${participantMode === 'category' ? 'bg-white shadow-sm text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
                                 >
-                                    <i className="fas fa-plus text-sm"></i>
+                                    قائمة الفئات / الديموغرافيا
                                 </button>
                             </div>
                         </div>
-                        {domains.some(d => d.isCategoryList) && (
-                            <p className="text-xs text-orange-600 font-bold mt-2 sm:mt-0 max-w-xs text-center sm:text-right">
-                                <i className="fas fa-info-circle"></i> سيتم استخدام مجموع الفئات المحددة كعدد نهائي للمشاركين.
-                            </p>
+
+                        {participantMode === 'simple' ? (
+                            <div className="flex flex-col sm:flex-row justify-center items-center gap-3 py-4">
+                                <span className="text-gray-700 font-bold">عدد المشاركين الإجمالي (Participants):</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-stretch shadow-inner rounded-lg overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
+                                        <button 
+                                            onClick={() => setParticipantsCount(Math.max(1, participantsCount - 1))}
+                                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 flex items-center justify-center transition-colors border-l border-gray-300 rounded-r cursor-pointer"
+                                        >
+                                            <i className="fas fa-minus text-sm"></i>
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={participantsCount}
+                                            onChange={(e) => setParticipantsCount(Math.max(1, Number(e.target.value)))}
+                                            className="w-24 p-2 text-xl text-center focus:outline-none font-black text-teal-800 leading-none bg-transparent"
+                                        />
+                                        <button 
+                                            onClick={() => setParticipantsCount(participantsCount + 1)}
+                                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 flex items-center justify-center transition-colors border-r border-gray-300 rounded-l cursor-pointer"
+                                        >
+                                            <i className="fas fa-plus text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="w-full pt-2 animate-fade-in">
+                                <div className="mb-4">
+                                    <label className="block text-teal-800 mb-1 text-xs font-black uppercase tracking-widest drop-shadow-sm">عنوان سؤال الفئة</label>
+                                    <input
+                                        type="text"
+                                        value={categoryTitle}
+                                        onChange={(e) => setCategoryTitle(e.target.value)}
+                                        className="w-full sm:w-1/2 p-2 border border-teal-200 rounded-lg text-base font-bold focus:outline-none focus:border-teal-500 bg-teal-50/50 shadow-inner"
+                                        placeholder="مثال: البرنامج / القسم"
+                                    />
+                                </div>
+                                <div className="overflow-x-auto pb-2">
+                                    <table className="w-full text-right border-collapse rounded-lg overflow-hidden shadow-sm border border-teal-700/30">
+                                        <thead className="bg-[#c5e0b4] border-b-2 border-teal-800/40">
+                                            <tr>
+                                                <th className="p-2.5 border-l border-teal-800/20 text-center font-black text-teal-900 w-32 shadow-sm">النسبة المتوقعة</th>
+                                                <th className="p-2.5 border-l border-teal-800/20 text-center font-black text-teal-900 w-44 shadow-sm">العدد</th>
+                                                <th className="p-2.5 text-right font-black text-teal-900 shadow-sm pr-4">الفئة (اسم الخيار)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {categories.map((item) => (
+                                                <tr key={item.id} className={`border-b border-gray-200 transition-colors ${item.selected ? 'bg-white hover:bg-teal-50/50' : 'bg-gray-100 opacity-60'}`}>
+                                                    <td className="p-2 border-l border-gray-200 text-center bg-teal-50/30">
+                                                        <div className="flex items-center justify-center gap-1 font-black text-lg text-gray-800">
+                                                            <input 
+                                                                type="number" 
+                                                                value={item.expectedPercentage} 
+                                                                onChange={(e) => updateCategoryField(item.id, 'expectedPercentage', e.target.value)}
+                                                                className="w-16 text-center bg-transparent focus:outline-none focus:border-b-2 focus:border-teal-600 transition-all"
+                                                                disabled={!item.selected}
+                                                            /> <span className="text-sm">%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 border-l border-gray-200 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button onClick={() => updateCategoryField(item.id, 'count', Math.max(0, Number(item.count) - 1))} disabled={!item.selected} className="w-8 h-8 rounded bg-white border border-gray-300 shadow-sm hover:bg-gray-100 hover:scale-105 transition-all flex items-center justify-center font-black text-gray-600 cursor-pointer">-</button>
+                                                            <input 
+                                                                type="number" 
+                                                                value={item.count} 
+                                                                onChange={(e) => updateCategoryField(item.id, 'count', e.target.value)}
+                                                                className="w-14 text-center font-black text-lg focus:outline-none bg-transparent"
+                                                                disabled={!item.selected}
+                                                            />
+                                                            <button onClick={() => updateCategoryField(item.id, 'count', Number(item.count) + 1)} disabled={!item.selected} className="w-8 h-8 rounded bg-white border border-gray-300 shadow-sm hover:bg-gray-100 hover:scale-105 transition-all flex items-center justify-center font-black text-gray-600 cursor-pointer">+</button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 flex items-center gap-3 pr-4 h-full min-h-[50px]">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={item.selected} 
+                                                            onChange={(e) => updateCategoryField(item.id, 'selected', e.target.checked)}
+                                                            className="w-5 h-5 accent-teal-600 cursor-pointer flex-shrink-0"
+                                                        />
+                                                        <input 
+                                                            type="text" 
+                                                            value={item.text} 
+                                                            onChange={(e) => updateCategoryField(item.id, 'text', e.target.value)}
+                                                            className={`w-full bg-transparent focus:outline-none focus:border-b focus:border-teal-400 text-base md:text-lg transition-all ${item.selected ? 'font-bold text-gray-900' : 'text-gray-500 line-through'}`}
+                                                        />
+                                                        {categories.length > 1 && (
+                                                            <button onClick={() => removeCategory(item.id)} className="text-red-400 hover:text-red-600 transition-colors cursor-pointer mr-2" title="حذف الفئة">
+                                                                <i className="fas fa-trash"></i>
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="mt-3 flex justify-between items-center text-sm">
+                                    <button onClick={addCategory} className="btn-shiny btn-shiny-teal px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 shadow-sm group cursor-pointer">
+                                        <i className="fas fa-plus drop-shadow-sm group-hover:scale-110 transition-transform"></i> إضافة فئة جديدة
+                                    </button>
+                                    <span className="font-black text-teal-800 bg-teal-50 px-3 py-1 rounded-lg border border-teal-200">
+                                        المجموع الكلي: {categories.filter(c => c.selected).reduce((acc, curr) => acc + (Number(curr.count) || 0), 0)} مشارك
+                                    </span>
+                                </div>
+                            </div>
                         )}
                     </div>
                     
@@ -1578,15 +1672,12 @@
                         {domains.length === 0 && (
                             <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-400 text-center hover-zoom mb-4">
                                 <span className="text-5xl drop-shadow-sm mb-3 inline-block animate-bounce">📁</span>
-                                <h3 className="text-xl text-blue-800 font-black mb-2">لا توجد محاور أو أسئلة لعرضها حالياً</h3>
-                                <p className="text-gray-500 text-sm font-bold">قم برفع ملف استجابات/قالب أو أضف محوراً يدوياً للبدء.</p>
+                                <h3 className="text-xl text-blue-800 font-black mb-2">لا توجد محاور لعرضها حالياً</h3>
+                                <p className="text-gray-500 text-sm font-bold">قم بإضافة محور جديد أو رفع ملف قالب Excel للبدء في تصميم استبيانك.</p>
                                 
                                 <div className="flex flex-wrap justify-center gap-3 mt-5">
                                     <button onClick={addDomain} className="btn-shiny btn-shiny-green px-5 py-2.5 rounded-xl text-lg font-black flex items-center gap-2 group shadow-md cursor-pointer">
                                         <span className="text-xl drop-shadow-sm group-hover:scale-110 transition-transform">➕</span> إضافة محور أسئلة (Grid)
-                                    </button>
-                                    <button onClick={addCategoryList} className="btn-shiny btn-shiny-blue px-5 py-2.5 rounded-xl text-lg font-black flex items-center gap-2 group shadow-md cursor-pointer">
-                                        <span className="text-xl drop-shadow-sm group-hover:scale-110 transition-transform">📋</span> قائمة الفئات
                                     </button>
                                     <button onClick={addFrequencyQuestion} className="btn-shiny btn-shiny-purple px-5 py-2.5 rounded-xl text-lg font-black flex items-center gap-2 group shadow-md cursor-pointer">
                                         <span className="text-xl drop-shadow-sm group-hover:scale-110 transition-transform">📊</span> سؤال تكرار/N
@@ -1595,92 +1686,7 @@
                             </div>
                         )}
                         
-                        {}
                         {domains.map(domain => {
-                            if (domain.isCategoryList) {
-                                return (
-                                    <div key={domain.id} className="bg-white p-4 rounded-xl shadow-md mb-5 border-r-4 border-yellow-500 hover-zoom">
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-3 pb-3 border-b-2 border-yellow-100">
-                                            <div className="flex-1 w-full">
-                                                <label className="block text-yellow-800 mb-1 text-xs font-black uppercase tracking-widest drop-shadow-sm">قائمة الفئات (Category List)</label>
-                                                <input
-                                                    type="text"
-                                                    value={domain.name}
-                                                    onChange={(e) => updateDomain(domain.id, 'name', e.target.value)}
-                                                    className="w-full p-2 md:p-2.5 border border-yellow-200 rounded-lg text-lg md:text-xl font-black focus:outline-none focus:border-yellow-500 bg-yellow-50 shadow-inner"
-                                                    placeholder="أدخل اسم القائمة (مثال: البرنامج / القسم)"
-                                                />
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="overflow-x-auto pb-2">
-                                            <table className="w-full text-right border-collapse rounded-lg overflow-hidden shadow-sm border border-green-700/30">
-                                                <thead className="bg-[#c5e0b4] border-b-2 border-green-800/40">
-                                                    <tr>
-                                                        <th className="p-2.5 border-l border-green-800/20 text-center font-black text-green-900 w-32 shadow-sm">النسبة المتوقعة</th>
-                                                        <th className="p-2.5 border-l border-green-800/20 text-center font-black text-green-900 w-44 shadow-sm">العدد</th>
-                                                        <th className="p-2.5 text-right font-black text-green-900 shadow-sm pr-4">الفئة</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {domain.items.map((item, idx) => (
-                                                        <tr key={item.id} className={`border-b border-gray-200 transition-colors ${item.selected ? 'bg-white hover:bg-green-50/50' : 'bg-gray-100 opacity-60'}`}>
-                                                            <td className="p-2 border-l border-gray-200 text-center bg-green-50/30">
-                                                                <div className="flex items-center justify-center gap-1 font-black text-lg text-gray-800">
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={item.expectedPercentage} 
-                                                                        onChange={(e) => updateItemField(domain.id, item.id, 'expectedPercentage', e.target.value)}
-                                                                        className="w-16 text-center bg-transparent focus:outline-none focus:border-b-2 focus:border-green-600 transition-all"
-                                                                        disabled={!item.selected}
-                                                                    /> <span className="text-sm">%</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-2 border-l border-gray-200 text-center">
-                                                                <div className="flex items-center justify-center gap-2">
-                                                                    <button onClick={() => updateItemField(domain.id, item.id, 'count', Math.max(0, Number(item.count) - 1))} disabled={!item.selected} className="w-8 h-8 rounded bg-white border border-gray-300 shadow-sm hover:bg-gray-100 hover:scale-105 transition-all flex items-center justify-center font-black text-gray-600">-</button>
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={item.count} 
-                                                                        onChange={(e) => updateItemField(domain.id, item.id, 'count', e.target.value)}
-                                                                        className="w-14 text-center font-black text-lg focus:outline-none bg-transparent"
-                                                                        disabled={!item.selected}
-                                                                    />
-                                                                    <button onClick={() => updateItemField(domain.id, item.id, 'count', Number(item.count) + 1)} disabled={!item.selected} className="w-8 h-8 rounded bg-white border border-gray-300 shadow-sm hover:bg-gray-100 hover:scale-105 transition-all flex items-center justify-center font-black text-gray-600">+</button>
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-2 flex items-center gap-3 pr-4 h-full min-h-[50px]">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={item.selected} 
-                                                                    onChange={(e) => updateItemField(domain.id, item.id, 'selected', e.target.checked)}
-                                                                    className="w-5 h-5 accent-green-600 cursor-pointer flex-shrink-0"
-                                                                />
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={item.text} 
-                                                                    onChange={(e) => updateItemText(domain.id, item.id, e.target.value)}
-                                                                    className={`w-full bg-transparent focus:outline-none focus:border-b focus:border-green-400 text-base md:text-lg transition-all ${item.selected ? 'font-bold text-gray-900' : 'text-gray-500 line-through'}`}
-                                                                />
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div className="mt-4 flex justify-between border-t-2 border-gray-100 pt-3">
-                                            <button onClick={() => addItemToCategory(domain.id)} className="btn-shiny btn-shiny-teal px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm group">
-                                                <i className="fas fa-plus drop-shadow-sm group-hover:scale-110 transition-transform"></i> إضافة فئة جديدة
-                                            </button>
-                                            <button onClick={() => removeDomain(domain.id)} className="btn-shiny btn-shiny-red px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm group">
-                                                <span className="text-base drop-shadow-sm group-hover:animate-pulse">🗑️</span> حذف السؤال
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // Render specific tool for Frequency / Multi-Select questions
                             if (domain.isFrequencyQuestion) {
                                 return (
                                     <div key={domain.id} className="bg-white p-4 rounded-xl shadow-md mb-5 border-r-4 border-purple-500 hover-zoom">
@@ -1766,7 +1772,6 @@
                                 );
                             }
 
-                            // Render standard Grid / Likert domain
                             return (
                                 <div 
                                     key={domain.id} 
@@ -2079,9 +2084,6 @@
                             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6 mb-8 hover-zoom flex-wrap">
                                 <button onClick={addDomain} className="btn-shiny btn-shiny-green px-6 py-3 rounded-xl text-lg font-bold flex items-center justify-center gap-2.5 shadow-md border-b-4 border-green-700 group cursor-pointer w-full sm:w-auto">
                                     <span className="text-2xl drop-shadow-sm group-hover:animate-bounce">📁</span> إضافة محور مصفوفة (Grid)
-                                </button>
-                                <button onClick={addCategoryList} className="btn-shiny btn-shiny-blue px-6 py-3 rounded-xl text-lg font-bold flex items-center justify-center gap-2.5 shadow-md border-b-4 border-blue-700 group cursor-pointer w-full sm:w-auto">
-                                    <span className="text-2xl drop-shadow-sm group-hover:animate-bounce">📋</span> إضافة فئات / ديموغرافيا
                                 </button>
                                 <button onClick={addFrequencyQuestion} className="btn-shiny btn-shiny-purple px-6 py-3 rounded-xl text-lg font-bold flex items-center justify-center gap-2.5 shadow-md border-b-4 border-purple-700 group cursor-pointer w-full sm:w-auto">
                                     <span className="text-2xl drop-shadow-sm group-hover:animate-bounce">📊</span> إضافة سؤال تكرار/N
